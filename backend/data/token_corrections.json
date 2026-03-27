@@ -1,0 +1,35 @@
+{
+  "_comment": "Token-level corrections keyed by source lemma. '_pos' overrides POS for all tokens with that lemma. Other keys are token forms (lowercase) mapping to a corrected DMF lemma.",
+
+  "@card@": {
+    "_pos": "NUM",
+     "Set/set/.VII.": "sept",
+    "vint/.XX./Vint": "vingt",
+    "Mil/milie/mil/mille": "mille",
+    "un/uns/une/Un": "un",
+	".C./cenz/cent/Cent/C.": "cent",
+	"Cinquante/cinquante/.L.": "cinquante",
+	"dis/.X./Dis": "dix",
+	"quinze/.XV.": "quinze",
+	".XII./duze": "douze",
+	"Quatre/quatre/.IIII.": "quatre",
+	"Dous/dous/.II./dui/Dui": "deux", 
+	".III./treis/Treis": "trois", 
+	"Ambes/Ambure/ambes": "ambe", 
+	"Ambedui/ansdous//ambdui/amdui/ambsdous/Ansdous/ambesdous/amsdous/Amsdous/ambedui/andui": "ambedeux",
+	"trente/.XXX.": "trente",
+	"seisante/Seisante": "soixante",
+	".XXIIII.": "vingt-quatre",
+	".VI.": "six",
+	".V./cinq": "cinq",
+	".XL./quarante": "quarante",
+	".XVII.": "dix-sept",
+	".VI.": "six",
+	"quarters": "quartier"
+  },
+
+  "@ord@": {
+    "_pos": "NUM"
+  }
+}
+

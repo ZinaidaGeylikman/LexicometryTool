@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: medieval-corpus-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./textes:/app/textes
+    environment:
+      - DATABASE_URL=sqlite:///./data/corpus.db
+      - DEBUG=true
+    restart: unless-stopped
+
+  # Frontend will be added in Phase 4
+  # frontend:
+  #   build: ./frontend
+  #   container_name: medieval-corpus-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./frontend:/app
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+
+volumes:
+  data:
