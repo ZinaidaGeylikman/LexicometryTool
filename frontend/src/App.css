@@ -735,7 +735,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  max-height: 260px;
+  max-height: 400px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -759,4 +759,18 @@ body {
 .text-check-title {
   flex: 1;
   font-size: 0.9rem;
+}
+
+.text-checklist-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.4rem;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }

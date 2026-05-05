@@ -11,6 +11,7 @@ class TEIMetadata:
     """Metadata extracted from TEI header"""
     title: Optional[str] = None
     author: Optional[str] = None
+    header_meta: Optional[dict] = None  # full structured header info
     # Composition dates (period_start/period_end kept as aliases for backward compat)
     period_start: Optional[int] = None
     period_end: Optional[int] = None
@@ -45,6 +46,7 @@ class TEIMetadataExtractor:
 
         metadata.title = cls._extract_title(tei_header)
         metadata.author = cls._extract_author(tei_header)
+        metadata.header_meta = cls._extract_header_meta(tei_header)
 
         comp_start, comp_end = cls._extract_composition_dates(tei_header)
         metadata.period_start = comp_start
@@ -74,6 +76,8 @@ class TEIMetadataExtractor:
         for path in [
             f'.//{cls.TEI_NS}titleStmt/{cls.TEI_NS}author',
             './/titleStmt/author',
+            f'.//{cls.TEI_NS}titleStmt/{cls.TEI_NS}persName[@role="author"]',
+            './/titleStmt/persName[@role="author"]',
         ]:
             elem = tei_header.find(path)
             if elem is not None:
@@ -81,6 +85,84 @@ class TEIMetadataExtractor:
                 if text:
                     return text
         return None
+
+    @classmethod
+    def _extract_header_meta(cls, tei_header: ET.Element) -> dict:
+        """Extract structured attribution/credit info from the TEI header."""
+        meta = {}
+        ns = cls.TEI_NS
+
+        def txt(el):
+            return "".join(el.itertext()).strip() if el is not None else None
+
+        # Editor
+        for path in [f'.//{ns}titleStmt/{ns}editor', './/titleStmt/editor']:
+            el = tei_header.find(path)
+            if el is not None:
+                v = txt(el)
+                if v:
+                    meta['editor'] = v
+                    break
+
+        # Funder
+        for path in [f'.//{ns}titleStmt/{ns}funder', './/titleStmt/funder']:
+            el = tei_header.find(path)
+            if el is not None:
+                v = txt(el)
+                if v:
+                    meta['funder'] = v
+                    break
+
+        # respStmt entries (role → names), grouped by role
+        resp_entries = []
+        seen_roles = {}
+        for path in [f'.//{ns}editionStmt/{ns}respStmt', './/editionStmt/respStmt']:
+            for rs in tei_header.findall(path):
+                resp_el = rs.find(f'{ns}resp') or rs.find('resp')
+                role = txt(resp_el) if resp_el is not None else None
+                # Support both <name> (BFM) and <persName> (MICLE)
+                name_elems = (list(rs.findall(f'{ns}name')) or list(rs.findall('name')) or
+                              list(rs.findall(f'{ns}persName')) or list(rs.findall('persName')))
+                names = [txt(n) for n in name_elems if txt(n)]
+                if role and names:
+                    if role not in seen_roles:
+                        seen_roles[role] = len(resp_entries)
+                        resp_entries.append({'role': role, 'names': names})
+                    else:
+                        resp_entries[seen_roles[role]]['names'].extend(names)
+        if resp_entries:
+            meta['contributors'] = resp_entries
+
+        # Publisher
+        for path in [f'.//{ns}publicationStmt/{ns}publisher', './/publicationStmt/publisher']:
+            el = tei_header.find(path)
+            if el is not None:
+                v = txt(el)
+                if v:
+                    meta['publisher'] = v
+                    break
+
+        # Identifiers (idno)
+        for path in [f'.//{ns}publicationStmt/{ns}idno', './/publicationStmt/idno']:
+            for idno in tei_header.findall(path):
+                id_type = idno.get('type', '')
+                v = txt(idno)
+                if v and id_type:
+                    meta[f'idno_{id_type}'] = v
+
+        # How-to-cite
+        for path in [
+            f'.//{ns}availability//{ns}ab[@type="how_to_cite"]/{ns}bibl',
+            './/availability//ab/bibl',
+        ]:
+            el = tei_header.find(path)
+            if el is not None:
+                v = txt(el)
+                if v:
+                    meta['citation'] = v
+                    break
+
+        return meta
 
     # ------------------------------------------------------------------
     # Composition dates

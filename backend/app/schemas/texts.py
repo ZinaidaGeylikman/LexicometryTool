@@ -8,6 +8,8 @@ class TextMetadataUpdate(BaseModel):
     """Request body for updating text metadata"""
     title: Optional[str] = None
     author: Optional[str] = None
+    source_db: Optional[str] = None
+    source_db_url: Optional[str] = None
     domain: Optional[str] = None
     genre: Optional[str] = None
     period_start: Optional[int] = None
@@ -22,6 +24,9 @@ class TextResponse(BaseModel):
     filename: str
     title: Optional[str] = None
     author: Optional[str] = None
+    source_db: Optional[str] = None
+    source_db_url: Optional[str] = None
+    tei_header_meta: Optional[dict] = None
     domain: Optional[str] = None
     genre: Optional[str] = None
     period_start: Optional[int] = None

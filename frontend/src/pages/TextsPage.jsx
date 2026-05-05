@@ -1,10 +1,74 @@
 import { useEffect, useState } from "react";
 import { fetchTexts, uploadText, updateText, deleteText } from "../api/client";
 
+function HeaderMetaModal({ text, onClose }) {
+  const m = text.tei_header_meta || {};
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <h3>Header info — {text.title || text.filename}</h3>
+        {m.citation && (
+          <div style={{ marginBottom: "1rem" }}>
+            <strong>Citation</strong>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem" }}>{m.citation}</p>
+          </div>
+        )}
+        {m.editor && (
+          <div style={{ marginBottom: "0.5rem" }}>
+            <strong>Editor</strong>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem" }}>{m.editor}</p>
+          </div>
+        )}
+        {m.funder && (
+          <div style={{ marginBottom: "0.5rem" }}>
+            <strong>Funder</strong>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem" }}>{m.funder}</p>
+          </div>
+        )}
+        {m.publisher && (
+          <div style={{ marginBottom: "0.5rem" }}>
+            <strong>Publisher</strong>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem" }}>{m.publisher}</p>
+          </div>
+        )}
+        {m.contributors && m.contributors.length > 0 && (
+          <div style={{ marginBottom: "0.5rem" }}>
+            <strong>Contributors</strong>
+            <table style={{ marginTop: "0.25rem", fontSize: "0.9rem", width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {m.contributors.map((c, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: "0.15rem 0.5rem 0.15rem 0", color: "#666", verticalAlign: "top", whiteSpace: "nowrap" }}>{c.role}</td>
+                    <td style={{ padding: "0.15rem 0" }}>{c.names.join(", ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {(m.idno_bfm || m.idno_doi) && (
+          <div style={{ marginBottom: "0.5rem" }}>
+            <strong>Identifiers</strong>
+            <div style={{ fontSize: "0.9rem", marginTop: "0.25rem" }}>
+              {m.idno_bfm && <div><a href={m.idno_bfm} target="_blank" rel="noreferrer">{m.idno_bfm}</a></div>}
+              {m.idno_doi && <div>DOI: <a href={`https://doi.org/${m.idno_doi}`} target="_blank" rel="noreferrer">{m.idno_doi}</a></div>}
+            </div>
+          </div>
+        )}
+        <div className="modal-actions">
+          <button className="btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TextEditModal({ text, onSave, onCancel }) {
   const [form, setForm] = useState({
     title: text.title || "",
     author: text.author || "",
+    source_db: text.source_db || "",
+    source_db_url: text.source_db_url || "",
     domain: text.domain || "",
     genre: text.genre || "",
     period_start: text.period_start ?? "",
@@ -18,6 +82,8 @@ function TextEditModal({ text, onSave, onCancel }) {
     const data = {};
     if (form.title) data.title = form.title;
     if (form.author) data.author = form.author;
+    if (form.source_db) data.source_db = form.source_db;
+    if (form.source_db_url) data.source_db_url = form.source_db_url;
     if (form.domain) data.domain = form.domain;
     if (form.genre) data.genre = form.genre;
     if (form.period_start !== "") data.period_start = parseInt(form.period_start);
@@ -39,6 +105,16 @@ function TextEditModal({ text, onSave, onCancel }) {
           <div className="form-group">
             <label>Author</label>
             <input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="e.g. Chrétien de Troyes" />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Source database</label>
+              <input value={form.source_db} onChange={(e) => setForm({ ...form, source_db: e.target.value })} placeholder="e.g. BFM22" />
+            </div>
+            <div className="form-group">
+              <label>Source URL</label>
+              <input value={form.source_db_url} onChange={(e) => setForm({ ...form, source_db_url: e.target.value })} placeholder="https://..." />
+            </div>
           </div>
           <div className="form-group">
             <label>Domain</label>
@@ -83,6 +159,7 @@ export default function TextsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editText, setEditText] = useState(null);
+  const [headerText, setHeaderText] = useState(null);
   const [uploading, setUploading] = useState(false);
 
   const load = () => {
@@ -152,11 +229,10 @@ export default function TextsPage() {
             <th>ID</th>
             <th>Title</th>
             <th>Author</th>
-            <th>Filename</th>
+            <th>Source</th>
             <th>Domain</th>
             <th>Genre</th>
             <th>Period</th>
-            <th>Format</th>
             <th>Tokens</th>
             <th>Actions</th>
           </tr>
@@ -167,7 +243,23 @@ export default function TextsPage() {
               <td>{idx + 1}</td>
               <td>{t.title}</td>
               <td>{t.author || "-"}</td>
-              <td>{t.filename}</td>
+              <td>
+                {t.source_db
+                  ? (t.source_db_url
+                      ? <a href={t.source_db_url} target="_blank" rel="noreferrer">{t.source_db}</a>
+                      : t.source_db)
+                  : "-"}
+                {t.tei_header_meta && Object.keys(t.tei_header_meta).length > 0 && (
+                  <button
+                    className="btn btn-sm"
+                    title="View header info"
+                    onClick={() => setHeaderText(t)}
+                    style={{ marginLeft: "0.4rem", padding: "0 0.35rem", fontSize: "0.8rem" }}
+                  >
+                    ⓘ
+                  </button>
+                )}
+              </td>
               <td>{t.domain || "-"}</td>
               <td>{t.genre || "-"}</td>
               <td>
@@ -184,24 +276,16 @@ export default function TextsPage() {
                   </em></>
                 )}
               </td>
-              <td>{t.format_type || "-"}</td>
               <td>{t.token_count?.toLocaleString()}</td>
               <td className="actions-cell">
-                <button className="btn btn-sm" onClick={() => setEditText(t)}>
-                  Edit
-                </button>
-                <button
-                  className="btn btn-sm btn-danger"
-                  onClick={() => handleDelete(t.text_id, t.filename)}
-                >
-                  Delete
-                </button>
+                <button className="btn btn-sm" onClick={() => setEditText(t)}>Edit</button>
+                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.text_id, t.filename)}>Delete</button>
               </td>
             </tr>
           ))}
           {texts.length === 0 && (
             <tr>
-              <td colSpan={10} className="empty-row">
+              <td colSpan={9} className="empty-row">
                 No texts loaded. Upload an XML-TEI file to get started.
               </td>
             </tr>
@@ -210,11 +294,10 @@ export default function TextsPage() {
       </table>
 
       {editText && (
-        <TextEditModal
-          text={editText}
-          onSave={handleSave}
-          onCancel={() => setEditText(null)}
-        />
+        <TextEditModal text={editText} onSave={handleSave} onCancel={() => setEditText(null)} />
+      )}
+      {headerText && (
+        <HeaderMetaModal text={headerText} onClose={() => setHeaderText(null)} />
       )}
     </div>
   );

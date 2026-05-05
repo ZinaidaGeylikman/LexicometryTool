@@ -20,6 +20,8 @@ class CorpusManager:
         filepath: str,
         title: Optional[str] = None,
         author: Optional[str] = None,
+        source_db: Optional[str] = None,
+        source_db_url: Optional[str] = None,
         domain: Optional[str] = None,
         genre: Optional[str] = None,
         period_start: Optional[int] = None,
@@ -55,34 +57,35 @@ class CorpusManager:
         if existing:
             raise ValueError(f"Text '{filename}' already loaded (text_id={existing.text_id})")
 
-        # Extract metadata from TEI header (if not provided)
-        if title is None or author is None or period_start is None or period_end is None or ms_date_start is None:
-            print(f"Extracting metadata from TEI header...")
-            tei_metadata = TEIMetadataExtractor.extract_metadata(str(filepath))
+        # Extract metadata from TEI header (always, to capture header_meta)
+        print(f"Extracting metadata from TEI header...")
+        tei_metadata = TEIMetadataExtractor.extract_metadata(str(filepath))
 
-            if title is None and tei_metadata.title:
-                title = tei_metadata.title
-                print(f"  Found title: {title}")
+        if title is None and tei_metadata.title:
+            title = tei_metadata.title
+            print(f"  Found title: {title}")
 
-            if author is None and tei_metadata.author:
-                author = tei_metadata.author
-                print(f"  Found author: {author}")
+        if author is None and tei_metadata.author:
+            author = tei_metadata.author
+            print(f"  Found author: {author}")
 
-            if period_start is None and tei_metadata.period_start:
-                period_start = tei_metadata.period_start
-                print(f"  Found period start: {period_start}")
+        if period_start is None and tei_metadata.period_start:
+            period_start = tei_metadata.period_start
+            print(f"  Found period start: {period_start}")
 
-            if period_end is None and tei_metadata.period_end:
-                period_end = tei_metadata.period_end
-                print(f"  Found period end: {period_end}")
+        if period_end is None and tei_metadata.period_end:
+            period_end = tei_metadata.period_end
+            print(f"  Found period end: {period_end}")
 
-            if ms_date_start is None and tei_metadata.ms_date_start:
-                ms_date_start = tei_metadata.ms_date_start
-                print(f"  Found ms date start: {ms_date_start}")
+        if ms_date_start is None and tei_metadata.ms_date_start:
+            ms_date_start = tei_metadata.ms_date_start
+            print(f"  Found ms date start: {ms_date_start}")
 
-            if ms_date_end is None and tei_metadata.ms_date_end:
-                ms_date_end = tei_metadata.ms_date_end
-                print(f"  Found ms date end: {ms_date_end}")
+        if ms_date_end is None and tei_metadata.ms_date_end:
+            ms_date_end = tei_metadata.ms_date_end
+            print(f"  Found ms date end: {ms_date_end}")
+
+        tei_header_meta = tei_metadata.header_meta or None
 
         # Parse XML
         print(f"Parsing {filename}...")
@@ -96,6 +99,9 @@ class CorpusManager:
             filename=filename,
             title=title or filename,
             author=author,
+            source_db=source_db,
+            source_db_url=source_db_url,
+            tei_header_meta=tei_header_meta,
             domain=domain,
             genre=genre,
             period_start=period_start,
@@ -136,6 +142,8 @@ class CorpusManager:
         text_id: int,
         title: Optional[str] = None,
         author: Optional[str] = None,
+        source_db: Optional[str] = None,
+        source_db_url: Optional[str] = None,
         domain: Optional[str] = None,
         genre: Optional[str] = None,
         period_start: Optional[int] = None,
@@ -153,6 +161,10 @@ class CorpusManager:
             text.title = title
         if author is not None:
             text.author = author
+        if source_db is not None:
+            text.source_db = source_db
+        if source_db_url is not None:
+            text.source_db_url = source_db_url
         if domain is not None:
             text.domain = domain
         if genre is not None:
@@ -174,6 +186,8 @@ class CorpusManager:
         filename: str,
         title: Optional[str] = None,
         author: Optional[str] = None,
+        source_db: Optional[str] = None,
+        source_db_url: Optional[str] = None,
         domain: Optional[str] = None,
         genre: Optional[str] = None,
         period_start: Optional[int] = None,
@@ -191,6 +205,8 @@ class CorpusManager:
             text.text_id,
             title=title,
             author=author,
+            source_db=source_db,
+            source_db_url=source_db_url,
             domain=domain,
             genre=genre,
             period_start=period_start,
@@ -209,7 +225,8 @@ class CorpusManager:
 
     def list_texts(self) -> list[Text]:
         """List all texts"""
-        return self.db.query(Text).order_by(Text.date_added.desc()).all()
+        from sqlalchemy import nulls_last
+        return self.db.query(Text).order_by(nulls_last(Text.period_start.asc())).all()
 
     def delete_text(self, text_id: int) -> bool:
         """Delete a text and all its tokens"""

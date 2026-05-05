@@ -159,17 +159,51 @@ export default function SubcorporaPage() {
               <div className="form-group">
                 <label>Texts ({formTextIds.size} selected)</label>
                 <div className="text-checklist">
-                  {texts.map((t) => (
-                    <label key={t.text_id} className="text-check-item">
-                      <input
-                        type="checkbox"
-                        checked={formTextIds.has(t.text_id)}
-                        onChange={() => toggleText(t.text_id)}
-                      />
-                      <span className="text-check-title">{t.title || t.filename}</span>
-                      {t.domain && <span className="text-meta">{t.domain}{t.genre ? `/${t.genre}` : ""}</span>}
-                    </label>
-                  ))}
+                  {(() => {
+                    // Group texts by source_db, with ungrouped last
+                    const groups = {};
+                    texts.forEach((t) => {
+                      const key = t.source_db || "(no database)";
+                      if (!groups[key]) groups[key] = [];
+                      groups[key].push(t);
+                    });
+                    const sortedKeys = Object.keys(groups).sort((a, b) =>
+                      a === "(no database)" ? 1 : b === "(no database)" ? -1 : a.localeCompare(b)
+                    );
+                    return sortedKeys.map((db) => {
+                      const dbTexts = groups[db];
+                      const allSelected = dbTexts.every((t) => formTextIds.has(t.text_id));
+                      const toggleAll = () => {
+                        setFormTextIds((prev) => {
+                          const next = new Set(prev);
+                          if (allSelected) dbTexts.forEach((t) => next.delete(t.text_id));
+                          else dbTexts.forEach((t) => next.add(t.text_id));
+                          return next;
+                        });
+                      };
+                      return (
+                        <div key={db}>
+                          <div className="text-checklist-group-header">
+                            <span>{db}</span>
+                            <button type="button" className="btn btn-sm" onClick={toggleAll}>
+                              {allSelected ? "Deselect all" : "Select all"}
+                            </button>
+                          </div>
+                          {dbTexts.map((t) => (
+                            <label key={t.text_id} className="text-check-item">
+                              <input
+                                type="checkbox"
+                                checked={formTextIds.has(t.text_id)}
+                                onChange={() => toggleText(t.text_id)}
+                              />
+                              <span className="text-check-title">{t.title || t.filename}</span>
+                              {t.period_start && <span className="text-meta">{t.period_start}{t.period_end && t.period_end !== t.period_start ? `–${t.period_end}` : ""}</span>}
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
               {formError && <div className="error-box">{formError}</div>}

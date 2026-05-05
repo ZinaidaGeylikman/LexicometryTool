@@ -43,6 +43,11 @@ class Text(Base):
     title = Column(String(500))
     author = Column(String(500))
 
+    # Source database attribution
+    source_db = Column(String(200))       # e.g. "BFM22", "Condé"
+    source_db_url = Column(String(500))   # e.g. "https://bfm.ens-lyon.fr"
+    tei_header_meta = Column(JSON)        # full extracted header info
+
     # Two-level classification
     domain = Column(String(100), index=True)  # fiction, law, religious, etc.
     genre = Column(String(100), index=True)   # romance, epic, hagiography, etc.
