@@ -22,6 +22,10 @@ class FrequencyAnalyzer:
             return [v.strip().upper() for v in value.split('/') if v.strip()]
         return [v.strip().lower() for v in value.split('/') if v.strip()]
 
+    def _lemma_match(self, field, v: str):
+        """Match v as an exact lemma or as one alternative in a pipe-separated ambiguous lemma."""
+        return or_(field == v, field.like(f'{v}|%'), field.like(f'%|{v}'), field.like(f'%|{v}|%'))
+
     def _build_token_filters(
         self,
         lemma: Optional[str] = None,
@@ -37,13 +41,13 @@ class FrequencyAnalyzer:
         filters = []
         if lemma:
             lemma_vals = self._parse_alternatives(lemma)
-            filters.append(col.in_(lemma_vals))
+            filters.append(or_(*[self._lemma_match(col, v) for v in lemma_vals]))
         if pos:
             pos_vals = self._parse_alternatives(pos, uppercase=True)
             filters.append(Token.pos.in_(pos_vals))
         if not_lemma:
             lemma_vals = self._parse_alternatives(not_lemma)
-            filters.append(not_(col.in_(lemma_vals)))
+            filters.append(and_(*[not_(self._lemma_match(col, v)) for v in lemma_vals]))
         if not_pos:
             pos_vals = self._parse_alternatives(not_pos, uppercase=True)
             filters.append(not_(Token.pos.in_(pos_vals)))

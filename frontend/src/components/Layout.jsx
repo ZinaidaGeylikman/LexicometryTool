@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Link, Outlet } from "react-router-dom";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
@@ -15,10 +15,10 @@ export default function Layout() {
   return (
     <div className="app-layout">
       <header className="app-header">
-        <div className="app-brand">
+        <Link to="/" className="app-brand" style={{ textDecoration: "none", color: "inherit" }}>
           <h1 className="app-title">LogoScope</h1>
           <span className="app-subtitle">Medieval French Corpus Tool</span>
-        </div>
+        </Link>
         <nav className="app-nav">
           {navItems.map((item) => (
             <NavLink

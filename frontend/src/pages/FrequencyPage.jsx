@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PosSelector from "../components/PosSelector";
 import {
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
 } from "recharts";
 
@@ -17,47 +17,86 @@ import {
 
 /* ---- Shared chart + table display ---- */
 function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
+  const containerRef = useRef(null);
+
   if (!data) return null;
 
   const yLabel = normalize ? `per ${Number(perN || 10000).toLocaleString()} words` : "count";
+  const colHeader = view === "period" ? "Period" : view.charAt(0).toUpperCase() + view.slice(1);
+  const chartTitle = `Frequency of ${filterLabel || "(all)"} by ${view} (${yLabel})`;
 
   if (data.length === 0) {
     return <div className="card">No data found for the given filters.</div>;
   }
 
+  const handleExportCsv = () => {
+    const header = [colHeader, normalize ? "Relative freq." : "Count"];
+    const rows = data.map((d) => [d.name, d.value]);
+    const csv =
+      "\uFEFF" +
+      [header, ...rows]
+        .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `frequency_${view}.csv`;
+    a.click();
+  };
+
+  const handleExportPng = async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const { default: html2canvas } = await import("html2canvas");
+    const canvas = await html2canvas(container, { backgroundColor: "#ffffff", scale: 2 });
+    canvas.toBlob((blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `frequency_${view}.png`;
+      a.click();
+    });
+  };
+
   return (
     <div className="card chart-container">
-      <h3>
-        Frequency of {filterLabel} by {view} ({yLabel})
-      </h3>
-      <ResponsiveContainer width="100%" height={400}>
-        {view === "period" ? (
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#4a6fa5" strokeWidth={2} />
-          </LineChart>
-        ) : (
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" fill="#4a6fa5">
-              {data.map((_, i) => (
-                <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        )}
-      </ResponsiveContainer>
+      <div ref={containerRef}>
+      <h3>{chartTitle}</h3>
+        <ResponsiveContainer width="100%" height={400}>
+          {view === "period" ? (
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="value" name={yLabel} stroke="#4a6fa5" strokeWidth={2} />
+            </LineChart>
+          ) : (
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" name={yLabel} fill="#4a6fa5">
+                {data.map((_, i) => (
+                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
 
-      <table className="data-table" style={{ marginTop: "1rem" }}>
+      <div style={{ display: "flex", gap: "0.5rem", margin: "0.75rem 0" }}>
+        <button className="btn btn-sm" onClick={handleExportCsv}>Export CSV</button>
+        <button className="btn btn-sm" onClick={handleExportPng}>Export PNG</button>
+      </div>
+
+      <table className="data-table">
         <thead>
           <tr>
-            <th>{view === "period" ? "Period" : view.charAt(0).toUpperCase() + view.slice(1)}</th>
+            <th>{colHeader}</th>
             <th>{normalize ? "Relative freq." : "Count"}</th>
           </tr>
         </thead>

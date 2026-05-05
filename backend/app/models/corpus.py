@@ -41,6 +41,7 @@ class Text(Base):
     text_id = Column(Integer, primary_key=True, index=True)
     filename = Column(String(255), unique=True, nullable=False, index=True)
     title = Column(String(500))
+    author = Column(String(500))
 
     # Two-level classification
     domain = Column(String(100), index=True)  # fiction, law, religious, etc.

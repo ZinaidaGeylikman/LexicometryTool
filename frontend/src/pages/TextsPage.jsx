@@ -4,6 +4,7 @@ import { fetchTexts, uploadText, updateText, deleteText } from "../api/client";
 function TextEditModal({ text, onSave, onCancel }) {
   const [form, setForm] = useState({
     title: text.title || "",
+    author: text.author || "",
     domain: text.domain || "",
     genre: text.genre || "",
     period_start: text.period_start ?? "",
@@ -16,6 +17,7 @@ function TextEditModal({ text, onSave, onCancel }) {
     e.preventDefault();
     const data = {};
     if (form.title) data.title = form.title;
+    if (form.author) data.author = form.author;
     if (form.domain) data.domain = form.domain;
     if (form.genre) data.genre = form.genre;
     if (form.period_start !== "") data.period_start = parseInt(form.period_start);
@@ -33,6 +35,10 @@ function TextEditModal({ text, onSave, onCancel }) {
           <div className="form-group">
             <label>Title</label>
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>Author</label>
+            <input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="e.g. Chrétien de Troyes" />
           </div>
           <div className="form-group">
             <label>Domain</label>
@@ -145,6 +151,7 @@ export default function TextsPage() {
           <tr>
             <th>ID</th>
             <th>Title</th>
+            <th>Author</th>
             <th>Filename</th>
             <th>Domain</th>
             <th>Genre</th>
@@ -155,10 +162,11 @@ export default function TextsPage() {
           </tr>
         </thead>
         <tbody>
-          {texts.map((t) => (
+          {texts.map((t, idx) => (
             <tr key={t.text_id}>
-              <td>{t.text_id}</td>
+              <td>{idx + 1}</td>
               <td>{t.title}</td>
+              <td>{t.author || "-"}</td>
               <td>{t.filename}</td>
               <td>{t.domain || "-"}</td>
               <td>{t.genre || "-"}</td>
@@ -193,7 +201,7 @@ export default function TextsPage() {
           ))}
           {texts.length === 0 && (
             <tr>
-              <td colSpan={9} className="empty-row">
+              <td colSpan={10} className="empty-row">
                 No texts loaded. Upload an XML-TEI file to get started.
               </td>
             </tr>

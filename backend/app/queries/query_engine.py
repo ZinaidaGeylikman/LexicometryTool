@@ -44,12 +44,17 @@ class QueryEngine:
             return [v.strip().upper() for v in value.split('/') if v.strip()]
         return [v.strip().lower() for v in value.split('/') if v.strip()]
 
+    def _lemma_match(self, field, v: str):
+        """Match v as an exact lemma or as one alternative in a pipe-separated ambiguous lemma."""
+        return or_(field == v, field.like(f'{v}|%'), field.like(f'%|{v}'), field.like(f'%|{v}|%'))
+
     def _build_filter(
         self,
         include: Optional[str],
         exclude: Optional[str],
         field,
         match_numbered_variants: bool = False,
+        match_pipe_alternatives: bool = False,
         uppercase: bool = False,
     ):
         """
@@ -72,36 +77,32 @@ class QueryEngine:
         if include:
             values = self._parse_alternatives(include, uppercase=uppercase)
             if values:
-                if match_numbered_variants:
-                    # Match both exact value and numbered variants (roi -> roi, roi2, roi3...)
-                    # Uses GLOB to match only trailing digits, not other words (e.g., NOT roiaume)
-                    conditions = []
-                    for v in values:
+                conditions = []
+                for v in values:
+                    if match_numbered_variants:
                         conditions.append(field == v)
                         conditions.append(field.op('GLOB')(v + '[0-9]'))
                         conditions.append(field.op('GLOB')(v + '[0-9][0-9]'))
-                    filters.append(or_(*conditions))
-                else:
-                    if len(values) == 1:
-                        filters.append(field == values[0])
-                    else:
-                        filters.append(field.in_(values))
+                    if match_pipe_alternatives:
+                        conditions.append(self._lemma_match(field, v))
+                    elif not match_numbered_variants:
+                        conditions.append(field == v)
+                filters.append(or_(*conditions))
 
         # Exclude filter
         if exclude:
             values = self._parse_alternatives(exclude, uppercase=uppercase)
             if values:
-                if match_numbered_variants:
-                    conditions = []
-                    for v in values:
+                conditions = []
+                for v in values:
+                    if match_numbered_variants:
                         conditions.append(field != v)
                         conditions.append(not_(field.like(v + '%')))
-                    filters.append(and_(*conditions))
-                else:
-                    if len(values) == 1:
-                        filters.append(field != values[0])
-                    else:
-                        filters.append(not_(field.in_(values)))
+                    if match_pipe_alternatives:
+                        conditions.append(not_(self._lemma_match(field, v)))
+                    elif not match_numbered_variants:
+                        conditions.append(field != v)
+                filters.append(and_(*conditions))
 
         return and_(*filters) if filters else None
 
@@ -121,7 +122,8 @@ class QueryEngine:
         # match_numbered_variants only applies to source TL lemmas (CATTEX convention: roi2, roi3).
         lemma_col = Token.lemma_dmf if lemma_field == "dmf" else Token.lemma
         lemma_filter = self._build_filter(lemma, not_lemma, lemma_col,
-                                          match_numbered_variants=(lemma_field != "dmf"))
+                                          match_numbered_variants=(lemma_field != "dmf"),
+                                          match_pipe_alternatives=True)
         if lemma_filter is not None:
             filters.append(lemma_filter)
 

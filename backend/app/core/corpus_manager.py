@@ -19,6 +19,7 @@ class CorpusManager:
         self,
         filepath: str,
         title: Optional[str] = None,
+        author: Optional[str] = None,
         domain: Optional[str] = None,
         genre: Optional[str] = None,
         period_start: Optional[int] = None,
@@ -55,13 +56,17 @@ class CorpusManager:
             raise ValueError(f"Text '{filename}' already loaded (text_id={existing.text_id})")
 
         # Extract metadata from TEI header (if not provided)
-        if title is None or period_start is None or period_end is None or ms_date_start is None:
+        if title is None or author is None or period_start is None or period_end is None or ms_date_start is None:
             print(f"Extracting metadata from TEI header...")
             tei_metadata = TEIMetadataExtractor.extract_metadata(str(filepath))
 
             if title is None and tei_metadata.title:
                 title = tei_metadata.title
                 print(f"  Found title: {title}")
+
+            if author is None and tei_metadata.author:
+                author = tei_metadata.author
+                print(f"  Found author: {author}")
 
             if period_start is None and tei_metadata.period_start:
                 period_start = tei_metadata.period_start
@@ -90,6 +95,7 @@ class CorpusManager:
         text = Text(
             filename=filename,
             title=title or filename,
+            author=author,
             domain=domain,
             genre=genre,
             period_start=period_start,
@@ -129,6 +135,7 @@ class CorpusManager:
         self,
         text_id: int,
         title: Optional[str] = None,
+        author: Optional[str] = None,
         domain: Optional[str] = None,
         genre: Optional[str] = None,
         period_start: Optional[int] = None,
@@ -144,6 +151,8 @@ class CorpusManager:
 
         if title is not None:
             text.title = title
+        if author is not None:
+            text.author = author
         if domain is not None:
             text.domain = domain
         if genre is not None:
@@ -164,6 +173,7 @@ class CorpusManager:
         self,
         filename: str,
         title: Optional[str] = None,
+        author: Optional[str] = None,
         domain: Optional[str] = None,
         genre: Optional[str] = None,
         period_start: Optional[int] = None,
@@ -180,6 +190,7 @@ class CorpusManager:
         return self.update_text_metadata(
             text.text_id,
             title=title,
+            author=author,
             domain=domain,
             genre=genre,
             period_start=period_start,

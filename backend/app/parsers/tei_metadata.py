@@ -10,6 +10,7 @@ from dataclasses import dataclass
 class TEIMetadata:
     """Metadata extracted from TEI header"""
     title: Optional[str] = None
+    author: Optional[str] = None
     # Composition dates (period_start/period_end kept as aliases for backward compat)
     period_start: Optional[int] = None
     period_end: Optional[int] = None
@@ -43,6 +44,7 @@ class TEIMetadataExtractor:
             return metadata
 
         metadata.title = cls._extract_title(tei_header)
+        metadata.author = cls._extract_author(tei_header)
 
         comp_start, comp_end = cls._extract_composition_dates(tei_header)
         metadata.period_start = comp_start
@@ -65,6 +67,19 @@ class TEIMetadataExtractor:
             title_elem = tei_header.find('.//titleStmt/title')
         if title_elem is not None and title_elem.text:
             return title_elem.text.strip()
+        return None
+
+    @classmethod
+    def _extract_author(cls, tei_header: ET.Element) -> Optional[str]:
+        for path in [
+            f'.//{cls.TEI_NS}titleStmt/{cls.TEI_NS}author',
+            './/titleStmt/author',
+        ]:
+            elem = tei_header.find(path)
+            if elem is not None:
+                text = "".join(elem.itertext()).strip()
+                if text:
+                    return text
         return None
 
     # ------------------------------------------------------------------

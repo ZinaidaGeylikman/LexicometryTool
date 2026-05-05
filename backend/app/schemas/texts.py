@@ -7,6 +7,7 @@ from datetime import datetime
 class TextMetadataUpdate(BaseModel):
     """Request body for updating text metadata"""
     title: Optional[str] = None
+    author: Optional[str] = None
     domain: Optional[str] = None
     genre: Optional[str] = None
     period_start: Optional[int] = None
@@ -20,6 +21,7 @@ class TextResponse(BaseModel):
     text_id: int
     filename: str
     title: Optional[str] = None
+    author: Optional[str] = None
     domain: Optional[str] = None
     genre: Optional[str] = None
     period_start: Optional[int] = None

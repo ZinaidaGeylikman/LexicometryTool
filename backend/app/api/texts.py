@@ -40,6 +40,7 @@ def update_text(text_id: int, data: TextMetadataUpdate, db: Session = Depends(ge
     success = manager.update_text_metadata(
         text_id,
         title=data.title,
+        author=data.author,
         domain=data.domain,
         genre=data.genre,
         period_start=data.period_start,
@@ -67,6 +68,7 @@ def delete_text(text_id: int, db: Session = Depends(get_db)):
 def upload_text(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
+    author: Optional[str] = Form(None),
     domain: Optional[str] = Form(None),
     genre: Optional[str] = Form(None),
     period_start: Optional[int] = Form(None),
@@ -90,6 +92,7 @@ def upload_text(
         text_id = manager.load_text(
             filepath,
             title=title,
+            author=author,
             domain=domain,
             genre=genre,
             period_start=period_start,
