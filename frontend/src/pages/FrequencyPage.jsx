@@ -3,6 +3,7 @@ import PosSelector from "../components/PosSelector";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
+  PieChart, Pie,
 } from "recharts";
 
 const BAR_COLORS = [
@@ -15,15 +16,30 @@ import {
   fetchSubcorpora, fetchTexts, fetchDatasets,
 } from "../api/client";
 
+const RADIAN = Math.PI / 180;
+function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, name, percent }) {
+  if (percent < 0.04) return null;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.6;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600}>
+      {name}
+    </text>
+  );
+}
+
 /* ---- Shared chart + table display ---- */
 function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
   const containerRef = useRef(null);
+  const [chartType, setChartType] = useState("bar");
 
   if (!data) return null;
 
   const yLabel = normalize ? `per ${Number(perN || 10000).toLocaleString()} words` : "count";
   const colHeader = view === "period" ? "Period" : view.charAt(0).toUpperCase() + view.slice(1);
   const chartTitle = `Frequency of ${filterLabel || "(all)"} by ${view} (${yLabel})`;
+  const isPie = chartType === "pie" && view !== "period";
 
   if (data.length === 0) {
     return <div className="card">No data found for the given filters.</div>;
@@ -52,15 +68,30 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
     canvas.toBlob((blob) => {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `frequency_${view}.png`;
+      a.download = `frequency_${view}_${chartType}.png`;
       a.click();
     });
   };
 
+  // Pie data needs a fill per slice
+  const pieData = data.map((d, i) => ({ ...d, fill: BAR_COLORS[i % BAR_COLORS.length] }));
+
   return (
     <div className="card chart-container">
       <div ref={containerRef}>
-      <h3>{chartTitle}</h3>
+        <h3>{chartTitle}</h3>
+        {view !== "period" && (
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <button
+              className={`btn btn-sm${chartType === "bar" ? " btn-primary" : ""}`}
+              onClick={() => setChartType("bar")}
+            >Bar</button>
+            <button
+              className={`btn btn-sm${chartType === "pie" ? " btn-primary" : ""}`}
+              onClick={() => setChartType("pie")}
+            >Pie</button>
+          </div>
+        )}
         <ResponsiveContainer width="100%" height={400}>
           {view === "period" ? (
             <LineChart data={data}>
@@ -71,6 +102,25 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
               <Legend />
               <Line type="monotone" dataKey="value" name={yLabel} stroke="#4a6fa5" strokeWidth={2} />
             </LineChart>
+          ) : isPie ? (
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={160}
+                labelLine={false}
+                label={PieLabel}
+              >
+                {pieData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [value, yLabel]} />
+              <Legend />
+            </PieChart>
           ) : (
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />

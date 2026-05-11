@@ -46,6 +46,25 @@ function HeaderMetaModal({ text, onClose }) {
             </table>
           </div>
         )}
+        {m.source && (
+          <div style={{ marginBottom: "0.5rem", borderTop: "1px solid var(--border)", paddingTop: "0.5rem" }}>
+            <strong>Source edition</strong>
+            <div style={{ fontSize: "0.9rem", marginTop: "0.25rem" }}>
+              {m.source.title && <div style={{ fontStyle: "italic" }}>{m.source.title}</div>}
+              {m.source.author && <div>Author: {m.source.author}</div>}
+              {m.source.editors && <div>Ed.: {m.source.editors.join(", ")}</div>}
+              {(m.source.publisher || m.source.pub_place || m.source.pub_date) && (
+                <div style={{ color: "#666" }}>
+                  {[m.source.publisher, m.source.pub_place, m.source.pub_date].filter(Boolean).join(", ")}
+                </div>
+              )}
+              {m.source.note && <div style={{ marginTop: "0.25rem", color: "#555" }}>{m.source.note}</div>}
+              {m.source.digital_source && (
+                <div>Digital source: <a href={m.source.digital_source.url} target="_blank" rel="noreferrer">{m.source.digital_source.label}</a></div>
+              )}
+            </div>
+          </div>
+        )}
         {(m.idno_bfm || m.idno_doi) && (
           <div style={{ marginBottom: "0.5rem" }}>
             <strong>Identifiers</strong>
@@ -79,17 +98,18 @@ function TextEditModal({ text, onSave, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const data = {};
-    if (form.title) data.title = form.title;
-    if (form.author) data.author = form.author;
-    if (form.source_db) data.source_db = form.source_db;
-    if (form.source_db_url) data.source_db_url = form.source_db_url;
-    if (form.domain) data.domain = form.domain;
-    if (form.genre) data.genre = form.genre;
-    if (form.period_start !== "") data.period_start = parseInt(form.period_start);
-    if (form.period_end !== "") data.period_end = parseInt(form.period_end);
-    if (form.ms_date_start !== "") data.ms_date_start = parseInt(form.ms_date_start);
-    if (form.ms_date_end !== "") data.ms_date_end = parseInt(form.ms_date_end);
+    const data = {
+      title: form.title || null,
+      author: form.author || null,
+      source_db: form.source_db || null,
+      source_db_url: form.source_db_url || null,
+      domain: form.domain || null,
+      genre: form.genre || null,
+      period_start: form.period_start !== "" ? parseInt(form.period_start) : null,
+      period_end: form.period_end !== "" ? parseInt(form.period_end) : null,
+      ms_date_start: form.ms_date_start !== "" ? parseInt(form.ms_date_start) : null,
+      ms_date_end: form.ms_date_end !== "" ? parseInt(form.ms_date_end) : null,
+    };
     onSave(data);
   };
 

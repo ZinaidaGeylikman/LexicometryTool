@@ -162,7 +162,157 @@ class TEIMetadataExtractor:
                     meta['citation'] = v
                     break
 
+        # Source edition (print original)
+        source = cls._extract_source_bibl(tei_header)
+        if source:
+            meta['source'] = source
+
         return meta
+
+    @classmethod
+    def _extract_source_bibl(cls, tei_header: ET.Element) -> Optional[dict]:
+        """
+        Extract print-edition info from <sourceDesc>.
+        Handles both BFM (<biblFull>) and MICLE (<bibl type="source">) structures.
+        """
+        ns = cls.TEI_NS
+
+        def txt(el):
+            return "".join(el.itertext()).strip() if el is not None else None
+
+        source = {}
+
+        # --- BFM: <sourceDesc><biblFull> ---
+        for path in [f'.//{ns}sourceDesc/{ns}biblFull', './/sourceDesc/biblFull']:
+            bib = tei_header.find(path)
+            if bib is None:
+                continue
+
+            # Title
+            for tp in [f'.//{ns}titleStmt/{ns}title', './/titleStmt/title']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['title'] = v
+                        break
+
+            # Author
+            for tp in [f'.//{ns}titleStmt/{ns}author', './/titleStmt/author']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['author'] = v
+                        break
+
+            # Editors / scientific editors from respStmt
+            editors = []
+            for rs_path in [f'.//{ns}titleStmt/{ns}respStmt', './/titleStmt/respStmt']:
+                for rs in bib.findall(rs_path):
+                    name_el = rs.find(f'{ns}name') or rs.find('name')
+                    if name_el is not None:
+                        v = txt(name_el)
+                        if v:
+                            editors.append(v)
+            if editors:
+                source['editors'] = editors
+
+            # Publisher / pubPlace / date
+            for tp in [f'.//{ns}publicationStmt/{ns}publisher', './/publicationStmt/publisher']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['publisher'] = v
+                        break
+            for tp in [f'.//{ns}publicationStmt/{ns}pubPlace', './/publicationStmt/pubPlace']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['pub_place'] = v
+                        break
+            for tp in [f'.//{ns}publicationStmt/{ns}date', './/publicationStmt/date']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['pub_date'] = v
+                        break
+
+            if source:
+                return source
+
+        # --- MICLE: <sourceDesc><bibl type="source"> ---
+        for path in [f'.//{ns}sourceDesc/{ns}bibl', './/sourceDesc/bibl']:
+            bib = tei_header.find(path)
+            if bib is None:
+                continue
+
+            for tp in [f'{ns}title[@type="main"]', 'title[@type="main"]', f'{ns}title', 'title']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['title'] = v
+                        break
+
+            for tp in [f'.//{ns}author//{ns}persName', './/author//persName',
+                       f'{ns}author', 'author']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['author'] = v
+                        break
+
+            for tp in [f'{ns}editor', 'editor']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['publisher'] = v
+                        break
+
+            for tp in [f'{ns}pubPlace', 'pubPlace']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['pub_place'] = v
+                        break
+
+            # Date (pick the publication date, not the composition date)
+            dates = bib.findall(f'{ns}date') or bib.findall('date')
+            for d in reversed(dates):  # last date is usually the publication date
+                v = txt(d)
+                if v:
+                    source['pub_date'] = v
+                    break
+
+            for tp in [f'{ns}note', 'note']:
+                el = bib.find(tp)
+                if el is not None:
+                    v = txt(el)
+                    if v:
+                        source['note'] = v
+                        break
+
+            # Digital source link (e.g. Gallica)
+            for tp in [f'{ns}source', 'source']:
+                el = bib.find(tp)
+                if el is not None:
+                    url = el.get('sameAs') or el.get('target') or el.get('href')
+                    label = txt(el)
+                    if url:
+                        source['digital_source'] = {'label': label or url, 'url': url}
+                    break
+
+            if source:
+                return source
+
+        return None if not source else source
 
     # ------------------------------------------------------------------
     # Composition dates

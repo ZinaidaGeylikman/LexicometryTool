@@ -49,6 +49,7 @@ def update_text(text_id: int, data: TextMetadataUpdate, db: Session = Depends(ge
         period_end=data.period_end,
         ms_date_start=data.ms_date_start,
         ms_date_end=data.ms_date_end,
+        force_update_fields=data.model_fields_set,
     )
     if not success:
         raise HTTPException(status_code=404, detail="Text not found")

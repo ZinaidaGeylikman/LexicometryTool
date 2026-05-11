@@ -150,32 +150,40 @@ class CorpusManager:
         period_end: Optional[int] = None,
         ms_date_start: Optional[int] = None,
         ms_date_end: Optional[int] = None,
+        force_update_fields: Optional[set] = None,
     ) -> bool:
-        """Update metadata for an existing text"""
+        """Update metadata for an existing text.
+        force_update_fields: field names to update even when value is None (clears the field).
+        """
         text = self.db.query(Text).filter(Text.text_id == text_id).first()
 
         if not text:
             return False
 
-        if title is not None:
-            text.title = title
-        if author is not None:
-            text.author = author
-        if source_db is not None:
-            text.source_db = source_db
-        if source_db_url is not None:
-            text.source_db_url = source_db_url
-        if domain is not None:
-            text.domain = domain
-        if genre is not None:
-            text.genre = genre
-        if period_start is not None:
+        force = force_update_fields or set()
+
+        def s(v):
+            return v.strip() if isinstance(v, str) and v else (None if isinstance(v, str) else v)
+
+        if title is not None or 'title' in force:
+            text.title = s(title)
+        if author is not None or 'author' in force:
+            text.author = s(author)
+        if source_db is not None or 'source_db' in force:
+            text.source_db = s(source_db)
+        if source_db_url is not None or 'source_db_url' in force:
+            text.source_db_url = s(source_db_url)
+        if domain is not None or 'domain' in force:
+            text.domain = s(domain)
+        if genre is not None or 'genre' in force:
+            text.genre = s(genre)
+        if period_start is not None or 'period_start' in force:
             text.period_start = period_start
-        if period_end is not None:
+        if period_end is not None or 'period_end' in force:
             text.period_end = period_end
-        if ms_date_start is not None:
+        if ms_date_start is not None or 'ms_date_start' in force:
             text.ms_date_start = ms_date_start
-        if ms_date_end is not None:
+        if ms_date_end is not None or 'ms_date_end' in force:
             text.ms_date_end = ms_date_end
 
         self.db.commit()
