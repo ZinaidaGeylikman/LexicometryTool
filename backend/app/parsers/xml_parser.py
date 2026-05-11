@@ -274,22 +274,29 @@ class XMLParser:
                     continue
                 token_text = form_elem.text.strip()
 
-                lemma = ud_pos = ''
+                lemma = ''
                 ud_pos = 'X'
+                ref_citation = None
                 for ana in elem.findall(f'{cls.TXM_NS}ana'):
                     ana_type = ana.get('type', '')
                     if ana_type == '#lemma':
                         lemma = (ana.text or '').strip('|').strip()
                     elif ana_type == '#ud-pos':
                         ud_pos = (ana.text or 'X').strip()
+                    elif ana_type == '#ref':
+                        ref_citation = (ana.text or '').strip() or None
 
+                # Fall back to surface form when lemma not yet verified
                 if not lemma:
-                    continue
+                    lemma = token_text.lower()
+
                 raw = lemma.lower()
+                # Use #ref citation if no structural citation available
+                citation = cls._build_citation(ctx) or ref_citation
                 tokens.append(ParsedToken(
                     position=position, token=token_text,
                     lemma=raw, lemma_dmf=normalize_lemma(raw),
-                    pos=ud_pos, citation=cls._build_citation(ctx)
+                    pos=ud_pos, citation=citation
                 ))
                 position += 1
 

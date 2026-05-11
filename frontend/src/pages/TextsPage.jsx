@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fetchTexts, uploadText, updateText, deleteText } from "../api/client";
 
 function HeaderMetaModal({ text, onClose }) {
@@ -174,13 +175,22 @@ function TextEditModal({ text, onSave, onCancel }) {
   );
 }
 
+const EMPTY_FILTERS = { search: "", author: "", source: "", domain: "", genre: "", periodStart: "", periodEnd: "", dateSource: "composition" };
+
 export default function TextsPage() {
+  const [searchParams] = useSearchParams();
   const [texts, setTexts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editText, setEditText] = useState(null);
   const [headerText, setHeaderText] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [filters, setFilters] = useState({
+    ...EMPTY_FILTERS,
+    domain: searchParams.get("domain") || "",
+    genre:  searchParams.get("genre")  || "",
+  });
+  const setF = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
   const load = () => {
     setLoading(true);
@@ -243,6 +253,66 @@ export default function TextsPage() {
 
       {error && <div className="error-box">Error: {error}</div>}
 
+      {/* Search + filter bar */}
+      {texts.length > 0 && (() => {
+        const sources = [...new Set(texts.map(t => t.source_db).filter(Boolean))].sort();
+        const domains = [...new Set(texts.map(t => t.domain).filter(Boolean))].sort();
+        const genres  = [...new Set(texts.map(t => t.genre).filter(Boolean))].sort();
+        const authors = [...new Set(texts.map(t => t.author).filter(Boolean))].sort();
+        const hasFilter = Object.entries(filters).some(([k, v]) => k !== "dateSource" && v !== "");
+        return (
+          <div className="card" style={{ marginBottom: "0.5rem" }}>
+            <input
+              value={filters.search}
+              onChange={e => setF("search", e.target.value)}
+              placeholder="Search title or author…"
+              style={{ width: "100%", marginBottom: "0.5rem" }}
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.4rem", marginBottom: "0.4rem" }}>
+              <select value={filters.source} onChange={e => setF("source", e.target.value)}>
+                <option value="">All databases</option>
+                {sources.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <select value={filters.domain} onChange={e => setF("domain", e.target.value)}>
+                <option value="">All domains</option>
+                {domains.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select value={filters.genre} onChange={e => setF("genre", e.target.value)}>
+                <option value="">All genres</option>
+                {genres.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <select value={filters.author} onChange={e => setF("author", e.target.value)}>
+                <option value="">All authors</option>
+                {authors.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", fontSize: "0.85rem" }}>
+              <input type="number" value={filters.periodStart} onChange={e => setF("periodStart", e.target.value)} placeholder="Period from…" style={{ width: 110 }} />
+              <input type="number" value={filters.periodEnd}   onChange={e => setF("periodEnd",   e.target.value)} placeholder="Period to…"   style={{ width: 110 }} />
+              <label style={{ fontWeight: "normal" }}><input type="radio" checked={filters.dateSource === "composition"} onChange={() => setF("dateSource", "composition")} /> Composition</label>
+              <label style={{ fontWeight: "normal" }}><input type="radio" checked={filters.dateSource === "manuscript"}  onChange={() => setF("dateSource", "manuscript")}  /> Manuscript</label>
+              {hasFilter && <button className="btn btn-sm" onClick={() => setFilters(EMPTY_FILTERS)} style={{ marginLeft: "auto" }}>Clear filters</button>}
+            </div>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const q = filters.search.toLowerCase();
+        const filtered = texts.filter(t => {
+          if (q && !(t.title || "").toLowerCase().includes(q) && !(t.author || "").toLowerCase().includes(q)) return false;
+          if (filters.author && (t.author || "") !== filters.author) return false;
+          if (filters.source && (t.source_db || "") !== filters.source) return false;
+          if (filters.domain && (t.domain || "") !== filters.domain) return false;
+          if (filters.genre  && (t.genre  || "") !== filters.genre)  return false;
+          const start = filters.dateSource === "manuscript" ? t.ms_date_start : t.period_start;
+          const end   = filters.dateSource === "manuscript" ? t.ms_date_end   : t.period_end;
+          if (filters.periodStart && (!end   || end   < parseInt(filters.periodStart))) return false;
+          if (filters.periodEnd   && (!start || start > parseInt(filters.periodEnd)))   return false;
+          return true;
+        });
+
+        return (
       <table className="data-table">
         <thead>
           <tr>
@@ -258,7 +328,7 @@ export default function TextsPage() {
           </tr>
         </thead>
         <tbody>
-          {texts.map((t, idx) => (
+          {filtered.map((t, idx) => (
             <tr key={t.text_id}>
               <td>{idx + 1}</td>
               <td>{t.title}</td>
@@ -303,15 +373,17 @@ export default function TextsPage() {
               </td>
             </tr>
           ))}
-          {texts.length === 0 && (
+          {filtered.length === 0 && (
             <tr>
               <td colSpan={9} className="empty-row">
-                No texts loaded. Upload an XML-TEI file to get started.
+                {texts.length === 0 ? "No texts loaded. Upload an XML-TEI file to get started." : "No texts match the filters."}
               </td>
             </tr>
           )}
         </tbody>
       </table>
+        );
+      })()}
 
       {editText && (
         <TextEditModal text={editText} onSave={handleSave} onCancel={() => setEditText(null)} />

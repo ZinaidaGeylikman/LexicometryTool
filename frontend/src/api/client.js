@@ -138,3 +138,7 @@ export function updateSubcorpus(id, params) {
 export function deleteSubcorpus(id) {
   return request(`/subcorpora/${id}`, { method: "DELETE" });
 }
+
+export function fetchSubcorpusStats(id) {
+  return request(`/subcorpora/${id}/stats`);
+}

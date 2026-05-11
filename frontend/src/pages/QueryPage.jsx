@@ -120,16 +120,19 @@ function ResultsDisplay({ results, form, goToPage, onExport }) {
 }
 
 /* ==== SIMPLE QUERY TAB ==== */
-function SimpleQuery({ datasets, subcorpora, texts, initialDatasetId }) {
+function SimpleQuery({ datasets, subcorpora, texts, initialDatasetId, initialState = {} }) {
   const [form, setForm] = useState({
-    lemma: "", pos: "", not_lemma: "", not_pos: "",
-    form: "", not_form: "",
-    domain: "", genre: "", period_start: "", period_end: "",
-    dataset_id: initialDatasetId || "", subcorpus_id: "", text_id: "",
+    lemma: initialState.lemma || "", pos: initialState.pos || "",
+    not_lemma: "", not_pos: "",
+    form: initialState.form || "", not_form: "",
+    domain: initialState.domain || "", genre: initialState.genre || "",
+    period_start: initialState.period_start || "", period_end: initialState.period_end || "",
+    dataset_id: initialState.dataset_id || initialDatasetId || "",
+    subcorpus_id: initialState.subcorpus_id || "", text_id: "",
     context_before: 5, context_after: 5, limit: 50, offset: 0,
   });
   const [lemmaField, setLemmaField] = useState("dmf");
-  const [searchType, setSearchType] = useState("lemma");
+  const [searchType, setSearchType] = useState(initialState.form ? "form" : "lemma");
 
   const handleSearchTypeChange = (type) => {
     setSearchType(type);
@@ -139,6 +142,33 @@ function SimpleQuery({ datasets, subcorpora, texts, initialDatasetId }) {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Auto-submit when navigated from a chart click
+  useEffect(() => {
+    if (initialState.autosubmit) {
+      const hasFilter = initialState.lemma || initialState.domain || initialState.genre ||
+                        initialState.period_start || initialState.subcorpus_id || initialState.form;
+      if (hasFilter) {
+        setLoading(true);
+        const params = {};
+        if (initialState.lemma) params.lemma = initialState.lemma;
+        if (initialState.form) params.form = initialState.form;
+        if (initialState.pos) params.pos = initialState.pos;
+        if (initialState.domain) params.domain = initialState.domain;
+        if (initialState.genre) params.genre = initialState.genre;
+        if (initialState.period_start) params.period_start = parseInt(initialState.period_start);
+        if (initialState.period_end) params.period_end = parseInt(initialState.period_end);
+        if (initialState.subcorpus_id) params.subcorpus_id = parseInt(initialState.subcorpus_id);
+        if (initialState.dataset_id) params.dataset_id = parseInt(initialState.dataset_id);
+        params.context_before = 5; params.context_after = 5;
+        params.limit = 50; params.offset = 0; params.lemma_field = "dmf";
+        queryCorpus(params)
+          .then(setResults)
+          .catch((e) => setError(e.message))
+          .finally(() => setLoading(false));
+      }
+    }
+  }, []);  // eslint-disable-line
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -598,6 +628,18 @@ function SequenceQuery({ datasets, subcorpora, texts, initialDatasetId }) {
 export default function QueryPage() {
   const [searchParams] = useSearchParams();
   const initialDatasetId = searchParams.get("dataset_id") || "";
+  const initialState = {
+    lemma:        searchParams.get("lemma")        || "",
+    form:         searchParams.get("form")         || "",
+    pos:          searchParams.get("pos")          || "",
+    domain:       searchParams.get("domain")       || "",
+    genre:        searchParams.get("genre")        || "",
+    period_start: searchParams.get("period_start") || "",
+    period_end:   searchParams.get("period_end")   || "",
+    subcorpus_id: searchParams.get("subcorpus_id") || "",
+    dataset_id:   initialDatasetId,
+    autosubmit:   searchParams.get("autosubmit")   === "1",
+  };
   const [tab, setTab] = useState("simple");
   const [datasets, setDatasets] = useState([]);
   const [subcorpora, setSubcorpora] = useState([]);
@@ -665,7 +707,7 @@ export default function QueryPage() {
       </div>
 
       {tab === "simple" ? (
-        <SimpleQuery datasets={datasets} subcorpora={subcorpora} texts={texts} initialDatasetId={initialDatasetId} />
+        <SimpleQuery datasets={datasets} subcorpora={subcorpora} texts={texts} initialDatasetId={initialDatasetId} initialState={initialState} />
       ) : (
         <SequenceQuery datasets={datasets} subcorpora={subcorpora} texts={texts} initialDatasetId={initialDatasetId} />
       )}

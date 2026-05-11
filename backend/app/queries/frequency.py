@@ -433,10 +433,18 @@ class FrequencyAnalyzer:
 
         unique_lemmas = self.db.query(func.count(func.distinct(Token.lemma))).scalar()
 
+        total_domains = self.db.query(func.count(func.distinct(Text.domain))).filter(Text.domain != None).scalar()
+        total_genres  = self.db.query(func.count(func.distinct(Text.genre))).filter(Text.genre != None).scalar()
+        period = self.db.query(func.min(Text.period_start), func.max(Text.period_end)).first()
+
         return {
             'total_tokens': total_tokens,
             'total_texts': total_texts,
             'unique_lemmas': unique_lemmas,
+            'total_domains': total_domains,
+            'total_genres': total_genres,
+            'period_start': period[0],
+            'period_end': period[1],
             'tokens_by_domain': {d: c for d, c in tokens_by_domain if d},
             'tokens_by_genre': {g: c for g, c in tokens_by_genre if g},
             'texts_by_domain': {d: c for d, c in texts_by_domain if d},

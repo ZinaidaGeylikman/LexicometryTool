@@ -1,8 +1,9 @@
 """API routes for subcorpora management"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from ..core.database import get_db
-from ..models import Subcorpus, Text
+from ..models import Subcorpus, Text, Token, subcorpus_texts
 from ..schemas.subcorpora import (
     SubcorpusCreate, SubcorpusUpdate, SubcorpusResponse,
     SubcorpusListResponse, SubcorpusTextInfo,
@@ -83,6 +84,43 @@ def update_subcorpus(subcorpus_id: int, params: SubcorpusUpdate, db: Session = D
     db.commit()
     db.refresh(sc)
     return _subcorpus_to_response(sc)
+
+
+@router.get("/{subcorpus_id}/stats")
+def subcorpus_stats(subcorpus_id: int, db: Session = Depends(get_db)):
+    """Return token count, domain/genre distribution and period range for a subcorpus."""
+    sc = db.query(Subcorpus).filter(Subcorpus.subcorpus_id == subcorpus_id).first()
+    if not sc:
+        raise HTTPException(status_code=404, detail="Subcorpus not found")
+
+    text_ids = [t.text_id for t in sc.texts]
+    if not text_ids:
+        return {"token_count": 0, "by_domain": {}, "by_genre": {}, "period_start": None, "period_end": None}
+
+    token_count = db.query(func.count(Token.token_id)).filter(Token.text_id.in_(text_ids)).scalar()
+
+    by_domain = {
+        row[0] or "unknown": row[1]
+        for row in db.query(Text.domain, func.sum(Text.token_count))
+            .filter(Text.text_id.in_(text_ids))
+            .group_by(Text.domain).all()
+    }
+    by_genre = {
+        row[0] or "unknown": row[1]
+        for row in db.query(Text.genre, func.sum(Text.token_count))
+            .filter(Text.text_id.in_(text_ids))
+            .group_by(Text.genre).all()
+    }
+
+    period = db.query(func.min(Text.period_start), func.max(Text.period_end)).filter(Text.text_id.in_(text_ids)).first()
+
+    return {
+        "token_count": token_count,
+        "by_domain": by_domain,
+        "by_genre": by_genre,
+        "period_start": period[0],
+        "period_end": period[1],
+    }
 
 
 @router.delete("/{subcorpus_id}")

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import PosSelector from "../components/PosSelector";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -30,9 +31,29 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, name, percent })
 }
 
 /* ---- Shared chart + table display ---- */
-function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
+function FrequencyResults({ data, view, normalize, perN, filterLabel, searchContext = {} }) {
   const containerRef = useRef(null);
   const [chartType, setChartType] = useState("bar");
+  const navigate = useNavigate();
+
+  const handleSliceClick = (entry) => {
+    const name = entry?.name || entry?.activeLabel;
+    if (!name) return;
+    const params = new URLSearchParams({ autosubmit: "1" });
+    if (searchContext.lemma) params.set("lemma", searchContext.lemma);
+    if (searchContext.form) params.set("form", searchContext.form);
+    if (searchContext.pos) params.set("pos", searchContext.pos);
+    if (searchContext.subcorpus_id) params.set("subcorpus_id", searchContext.subcorpus_id);
+    if (searchContext.text_id) params.set("text_id", searchContext.text_id);
+    if (searchContext.dataset_id) params.set("dataset_id", searchContext.dataset_id);
+    if (view === "domain") params.set("domain", name);
+    else if (view === "genre") params.set("genre", name);
+    else if (view === "period") {
+      params.set("period_start", name);
+      params.set("period_end", String(parseInt(name) + (searchContext.bin_size || 50) - 1));
+    }
+    navigate(`/query?${params}`);
+  };
 
   if (!data) return null;
 
@@ -94,13 +115,13 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
         )}
         <ResponsiveContainer width="100%" height={400}>
           {view === "period" ? (
-            <LineChart data={data}>
+            <LineChart data={data} onClick={(e) => e?.activeLabel && handleSliceClick({ name: e.activeLabel })} style={{ cursor: "pointer" }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="value" name={yLabel} stroke="#4a6fa5" strokeWidth={2} />
+              <Line type="monotone" dataKey="value" name={yLabel} stroke="#4a6fa5" strokeWidth={2} activeDot={{ r: 6, style: { cursor: "pointer" } }} />
             </LineChart>
           ) : isPie ? (
             <PieChart>
@@ -113,6 +134,8 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
                 outerRadius={160}
                 labelLine={false}
                 label={PieLabel}
+                onClick={(entry) => handleSliceClick(entry)}
+                style={{ cursor: "pointer" }}
               >
                 {pieData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
@@ -122,13 +145,13 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel }) {
               <Legend />
             </PieChart>
           ) : (
-            <BarChart data={data}>
+            <BarChart data={data} onClick={(e) => e?.activeLabel && handleSliceClick({ name: e.activeLabel })} style={{ cursor: "pointer" }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="value" name={yLabel} fill="#4a6fa5">
+              <Bar dataKey="value" name={yLabel} fill="#4a6fa5" onClick={(entry) => handleSliceClick(entry)}>
                 {data.map((_, i) => (
                   <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
                 ))}
@@ -443,7 +466,9 @@ function SimpleFrequency({ subcorpora, texts, datasets }) {
       </form>
 
       {error && <div className="error-box">Error: {error}</div>}
-      <FrequencyResults data={data} view={view} normalize={normalize} perN={perN} filterLabel={filterLabel} />
+      <FrequencyResults data={data} view={view} normalize={normalize} perN={perN} filterLabel={filterLabel}
+        searchContext={{ lemma: form.lemma, form: form.form, pos: form.pos,
+          subcorpus_id: form.subcorpus_id, text_id: form.text_id, dataset_id: form.dataset_id, bin_size: 50 }} />
     </>
   );
 }
@@ -663,7 +688,8 @@ function SequenceFrequency({ subcorpora, texts, datasets }) {
       </form>
 
       {error && <div className="error-box">Error: {error}</div>}
-      <FrequencyResults data={data} view={view} normalize={normalize} perN={perN} filterLabel={filterLabel} />
+      <FrequencyResults data={data} view={view} normalize={normalize} perN={perN} filterLabel={filterLabel}
+        searchContext={{ subcorpus_id, text_id: textId, dataset_id: datasetId, bin_size: 50 }} />
     </>
   );
 }

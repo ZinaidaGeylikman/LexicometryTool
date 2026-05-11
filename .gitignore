@@ -58,3 +58,14 @@ build/
 
 # Claude Code local settings
 .claude/
+
+# Corpus texts and reference PDFs (not distributed with the tool)
+textes/
+*.pdf
+backend/data/corpus.db*
+backend/data/uploads/
+backend/data/exports/
+backend/data/texts_metadata.csv
+backend/data/tei_header_meta.json
+backend/data/backup_metadata.py
+backend/data/restore_metadata.py
