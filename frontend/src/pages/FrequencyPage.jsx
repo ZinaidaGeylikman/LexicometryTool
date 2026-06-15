@@ -12,7 +12,7 @@ const BAR_COLORS = [
   "#d4a843", "#6b9ec5", "#c06b6b", "#7a9e7e",
 ];
 import {
-  frequencyByGenre, frequencyByDomain, frequencyByPeriod,
+  frequencyByGenre, frequencyByDomain, frequencyByPeriod, frequencyByText,
   seqFrequencyByGenre, seqFrequencyByDomain, seqFrequencyByPeriod,
   fetchSubcorpora, fetchTexts, fetchDatasets,
 } from "../api/client";
@@ -46,6 +46,11 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
     if (searchContext.subcorpus_id) params.set("subcorpus_id", searchContext.subcorpus_id);
     if (searchContext.text_id) params.set("text_id", searchContext.text_id);
     if (searchContext.dataset_id) params.set("dataset_id", searchContext.dataset_id);
+    // Pass filters from other dimensions (not the one being clicked)
+    if (view !== "domain" && searchContext.domain) params.set("domain", searchContext.domain);
+    if (view !== "genre"  && searchContext.genre)  params.set("genre",  searchContext.genre);
+    if (view !== "period" && searchContext.period_start) params.set("period_start", searchContext.period_start);
+    if (view !== "period" && searchContext.period_end)   params.set("period_end",   searchContext.period_end);
     if (view === "domain") params.set("domain", name);
     else if (view === "genre") params.set("genre", name);
     else if (view === "period") {
@@ -58,9 +63,9 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
   if (!data) return null;
 
   const yLabel = normalize ? `per ${Number(perN || 10000).toLocaleString()} words` : "count";
-  const colHeader = view === "period" ? "Period" : view.charAt(0).toUpperCase() + view.slice(1);
+  const colHeader = view === "period" ? "Period" : view === "text" ? "Text" : view.charAt(0).toUpperCase() + view.slice(1);
   const chartTitle = `Frequency of ${filterLabel || "(all)"} by ${view} (${yLabel})`;
-  const isPie = chartType === "pie" && view !== "period";
+  const isPie = chartType === "pie" && view !== "period" && view !== "text";
 
   if (data.length === 0) {
     return <div className="card">No data found for the given filters.</div>;
@@ -196,6 +201,7 @@ function ViewOptions({ view, setView, normalize, setNormalize, perN, setPerN, da
           <option value="genre">By Genre</option>
           <option value="domain">By Domain</option>
           <option value="period">By Period</option>
+          <option value="text">By Text</option>
         </select>
       </div>
       {lemmaField !== null && (
@@ -240,31 +246,27 @@ function ViewOptions({ view, setView, normalize, setNormalize, perN, setPerN, da
           </div>
         </div>
       )}
-      {view !== "period" && (
-        <>
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={normalize}
-                onChange={(e) => setNormalize(e.target.checked)}
-              />{" "}
-              Normalize
-            </label>
-          </div>
-          {normalize && (
-            <div className="form-group">
-              <label>Per N words</label>
-              <input
-                type="number"
-                value={perN}
-                onChange={(e) => setPerN(e.target.value)}
-                min={1}
-                step={1}
-              />
-            </div>
-          )}
-        </>
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={normalize}
+            onChange={(e) => setNormalize(e.target.checked)}
+          />{" "}
+          Normalize
+        </label>
+      </div>
+      {normalize && (
+        <div className="form-group">
+          <label>Per N words</label>
+          <input
+            type="number"
+            value={perN}
+            onChange={(e) => setPerN(e.target.value)}
+            min={1}
+            step={1}
+          />
+        </div>
       )}
     </>
   );
@@ -331,8 +333,10 @@ function SimpleFrequency({ subcorpora, texts, datasets }) {
         result = await frequencyByGenre({ ...params, normalize, per_n_words: parseInt(perN) || 10000 });
       } else if (view === "domain") {
         result = await frequencyByDomain({ ...params, normalize, per_n_words: parseInt(perN) || 10000 });
+      } else if (view === "text") {
+        result = await frequencyByText({ ...params, normalize, per_n_words: parseInt(perN) || 10000 });
       } else {
-        result = await frequencyByPeriod({ ...params, bin_size: 50, date_source: dateSource });
+        result = await frequencyByPeriod({ ...params, bin_size: 50, date_source: dateSource, normalize, per_n_words: parseInt(perN) || 10000 });
       }
 
       const chartData = Object.entries(result.data).map(([key, val]) => ({ name: key, value: val }));
@@ -468,6 +472,8 @@ function SimpleFrequency({ subcorpora, texts, datasets }) {
       {error && <div className="error-box">Error: {error}</div>}
       <FrequencyResults data={data} view={view} normalize={normalize} perN={perN} filterLabel={filterLabel}
         searchContext={{ lemma: form.lemma, form: form.form, pos: form.pos,
+          domain: form.domain, genre: form.genre,
+          period_start: form.period_start, period_end: form.period_end,
           subcorpus_id: form.subcorpus_id, text_id: form.text_id, dataset_id: form.dataset_id, bin_size: 50 }} />
     </>
   );
@@ -542,7 +548,7 @@ function SequenceFrequency({ subcorpora, texts, datasets }) {
       } else if (view === "domain") {
         result = await seqFrequencyByDomain({ pattern, normalize, per_n_words: parseInt(perN) || 10000, subcorpus_id: scId, text_id: tId, dataset_id: dId, period_start: pStart, period_end: pEnd, lemma_field: lemmaField });
       } else {
-        result = await seqFrequencyByPeriod({ pattern, bin_size: 50, subcorpus_id: scId, text_id: tId, dataset_id: dId, period_start: pStart, period_end: pEnd, date_source: dateSource, lemma_field: lemmaField });
+        result = await seqFrequencyByPeriod({ pattern, bin_size: 50, subcorpus_id: scId, text_id: tId, dataset_id: dId, period_start: pStart, period_end: pEnd, date_source: dateSource, lemma_field: lemmaField, normalize, per_n_words: parseInt(perN) || 10000 });
       }
 
       const chartData = Object.entries(result.data).map(([key, val]) => ({ name: key, value: val }));

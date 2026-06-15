@@ -62,6 +62,31 @@ def frequency_by_domain(params: FrequencyByGroupParams, db: Session = Depends(ge
     return FrequencyResponse(data=data)
 
 
+@router.post("/by-text", response_model=FrequencyResponse)
+def frequency_by_text(params: FrequencyByGroupParams, db: Session = Depends(get_db)):
+    """Get lemma frequency broken down by individual text"""
+    analyzer = FrequencyAnalyzer(db)
+    data = analyzer.frequency_by_text(
+        lemma=params.lemma,
+        pos=params.pos,
+        not_lemma=params.not_lemma,
+        not_pos=params.not_pos,
+        form=params.form,
+        not_form=params.not_form,
+        domain=getattr(params, 'domain', None),
+        genre=getattr(params, 'genre', None),
+        period_start=params.period_start,
+        period_end=params.period_end,
+        normalize=params.normalize,
+        per_n_words=params.per_n_words,
+        subcorpus_id=params.subcorpus_id,
+        text_id=params.text_id,
+        dataset_id=params.dataset_id,
+        lemma_field=params.lemma_field,
+    )
+    return FrequencyResponse(data=data)
+
+
 @router.post("/by-period", response_model=FrequencyResponse)
 def frequency_by_period(params: FrequencyByPeriodParams, db: Session = Depends(get_db)):
     """Get lemma frequency over time periods"""
@@ -81,6 +106,8 @@ def frequency_by_period(params: FrequencyByPeriodParams, db: Session = Depends(g
         dataset_id=params.dataset_id,
         date_source=params.date_source,
         lemma_field=params.lemma_field,
+        normalize=params.normalize,
+        per_n_words=params.per_n_words,
     )
     # Convert int keys to strings for JSON
     return FrequencyResponse(data={str(k): v for k, v in data.items()})
@@ -140,6 +167,8 @@ def seq_frequency_by_period(params: SeqFrequencyByPeriodParams, db: Session = De
         dataset_id=params.dataset_id,
         date_source=params.date_source,
         lemma_field=params.lemma_field,
+        normalize=params.normalize,
+        per_n_words=params.per_n_words,
     )
     return FrequencyResponse(data={str(k): v for k, v in data.items()})
 

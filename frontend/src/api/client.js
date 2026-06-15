@@ -81,6 +81,10 @@ export function frequencyByPeriod(params) {
   return request("/frequency/by-period", { method: "POST", body: JSON.stringify(params) });
 }
 
+export function frequencyByText(params) {
+  return request("/frequency/by-text", { method: "POST", body: JSON.stringify(params) });
+}
+
 // --- Sequence Frequency ---
 export function seqFrequencyByGenre(params) {
   return request("/frequency/sequence/by-genre", { method: "POST", body: JSON.stringify(params) });

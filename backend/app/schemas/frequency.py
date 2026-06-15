@@ -40,6 +40,8 @@ class FrequencyByPeriodParams(BaseModel):
     dataset_id: Optional[int] = None
     date_source: str = "composition"  # "composition" | "manuscript"
     lemma_field: str = "dmf"  # "dmf" | "source"
+    normalize: bool = False
+    per_n_words: int = Field(default=10000, ge=1)
 
 
 class FrequencyResponse(BaseModel):
@@ -72,6 +74,8 @@ class SeqFrequencyByPeriodParams(BaseModel):
     dataset_id: Optional[int] = None
     date_source: str = "composition"  # "composition" | "manuscript"
     lemma_field: str = "dmf"  # "dmf" | "source"
+    normalize: bool = False
+    per_n_words: int = Field(default=10000, ge=1)
 
 
 class LemmaIndexParams(BaseModel):

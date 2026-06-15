@@ -265,6 +265,10 @@ class QueryEngine:
             form=form, not_form=not_form, text_id=text_id,
         )
 
+        # Sort chronologically, then by position within each text
+        from sqlalchemy import nulls_last
+        query = query.order_by(nulls_last(Text.period_start.asc()), Token.text_id, Token.position)
+
         # Pagination
         if limit:
             query = query.limit(limit)
@@ -436,6 +440,11 @@ class QueryEngine:
                 dataset_ranges.setdefault(tid, []).append((start, end))
             # Only scan texts that are in both the metadata filter AND the dataset
             text_ids = [tid for tid in text_ids if tid in dataset_ranges]
+
+        # Sort text_ids chronologically before scanning
+        from sqlalchemy import nulls_last
+        period_map = {r[0]: r[1] for r in self.db.query(Text.text_id, Text.period_start).filter(Text.text_id.in_(text_ids)).all()}
+        text_ids = sorted(text_ids, key=lambda tid: (period_map.get(tid) is None, period_map.get(tid) or 0))
 
         # Phase 1: Fast scan — find match positions without fetching context
         # Each entry is (text_id, [start_position_indices]) — lightweight
@@ -649,13 +658,26 @@ class QueryEngine:
         dataset_id: Optional[int] = None,
         date_source: str = "composition",
         lemma_field: str = "dmf",
-    ) -> Dict[int, int]:
+        normalize: bool = False,
+        per_n_words: int = 10000,
+    ) -> Dict[int, float]:
         """Count sequence matches over time, binned by period using midpoint pivot."""
         if not pattern:
             return {}
         dataset_ranges = self._get_dataset_ranges(dataset_id) if dataset_id is not None else None
         texts = self._get_texts_for_sequence(domain=domain, genre=genre, subcorpus_id=subcorpus_id, text_id=text_id, dataset_id=dataset_id)
+
+        text_token_counts = {}
+        if normalize:
+            text_ids = [t.text_id for t in texts]
+            if text_ids:
+                rows = self.db.query(Token.text_id, func.count(Token.token_id)).filter(
+                    Token.text_id.in_(text_ids)
+                ).group_by(Token.text_id).all()
+                text_token_counts = {tid: cnt for tid, cnt in rows}
+
         period_counts = {}
+        bin_totals = {}
         for text in texts:
             if date_source == "manuscript" and (text.ms_date_start is not None or text.ms_date_end is not None):
                 d_start = text.ms_date_start if text.ms_date_start is not None else text.period_start
@@ -669,8 +691,17 @@ class QueryEngine:
             pivot = round((d_start + (d_end if d_end is not None else d_start)) / 2)
             bin_start = (pivot // bin_size) * bin_size
             period_counts[bin_start] = period_counts.get(bin_start, 0) + len(positions)
+            if normalize:
+                bin_totals[bin_start] = bin_totals.get(bin_start, 0) + text_token_counts.get(text.text_id, 0)
 
-        return dict(sorted(period_counts.items()))
+        if not normalize:
+            return dict(sorted(period_counts.items()))
+
+        normalized = {}
+        for b, count in period_counts.items():
+            if b in bin_totals and bin_totals[b] > 0:
+                normalized[b] = round((count / bin_totals[b]) * per_n_words, 2)
+        return dict(sorted(normalized.items()))
 
     def _find_sequence_positions_in_text(
         self,

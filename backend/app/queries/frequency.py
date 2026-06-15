@@ -216,6 +216,60 @@ class FrequencyAnalyzer:
 
         return relative_freqs
 
+    def frequency_by_text(
+        self,
+        lemma: Optional[str] = None,
+        pos: Optional[str] = None,
+        not_lemma: Optional[str] = None,
+        not_pos: Optional[str] = None,
+        domain: Optional[str] = None,
+        genre: Optional[str] = None,
+        period_start: Optional[int] = None,
+        period_end: Optional[int] = None,
+        normalize: bool = False,
+        per_n_words: int = 10000,
+        subcorpus_id: Optional[int] = None,
+        text_id: Optional[int] = None,
+        dataset_id: Optional[int] = None,
+        lemma_field: str = "dmf",
+        form: Optional[str] = None,
+        not_form: Optional[str] = None,
+    ) -> Dict[str, float]:
+        """Get frequency broken down by individual text, sorted chronologically."""
+        query = self.db.query(
+            Text.text_id,
+            func.coalesce(Text.title, Text.filename).label('label'),
+            Text.period_start,
+            func.count(Token.token_id).label('count')
+        ).join(Text, Token.text_id == Text.text_id)
+
+        filters = self._build_token_filters(lemma, pos, not_lemma, not_pos, lemma_field=lemma_field, form=form, not_form=not_form)
+        filters += self._build_metadata_filters(domain=domain, genre=genre, period_start=period_start, period_end=period_end, subcorpus_id=subcorpus_id, text_id=text_id, dataset_id=dataset_id)
+
+        if filters:
+            query = query.filter(and_(*filters))
+
+        results = query.group_by(Text.text_id).order_by(Text.period_start.asc()).all()
+
+        if not normalize:
+            return {label: count for _, label, _, count in results}
+
+        meta_filters = self._build_metadata_filters(domain=domain, genre=genre, period_start=period_start, period_end=period_end, subcorpus_id=subcorpus_id, dataset_id=dataset_id)
+        total_query = self.db.query(
+            Text.text_id,
+            func.count(Token.token_id).label('total')
+        ).join(Text, Token.text_id == Text.text_id)
+        if meta_filters:
+            total_query = total_query.filter(and_(*meta_filters))
+        totals = {tid: total for tid, total in total_query.group_by(Text.text_id).all()}
+
+        relative_freqs = {}
+        for tid, label, _, count in results:
+            if tid in totals and totals[tid] > 0:
+                relative_freqs[label] = round((count / totals[tid]) * per_n_words, 2)
+
+        return relative_freqs
+
     def frequency_by_period(
         self,
         lemma: Optional[str] = None,
@@ -232,7 +286,9 @@ class FrequencyAnalyzer:
         lemma_field: str = "dmf",
         form: Optional[str] = None,
         not_form: Optional[str] = None,
-    ) -> Dict[int, int]:
+        normalize: bool = False,
+        per_n_words: int = 10000,
+    ) -> Dict[int, float]:
         """Get frequency over time, binned by period using midpoint pivot."""
         query = self.db.query(
             Text.period_start,
@@ -253,20 +309,55 @@ class FrequencyAnalyzer:
             Text.ms_date_start, Text.ms_date_end,
         ).all()
 
-        period_counts = {}
-        for comp_start, comp_end, ms_start, ms_end, count in results:
+        def _bin(comp_start, comp_end, ms_start, ms_end):
             if date_source == "manuscript" and (ms_start is not None or ms_end is not None):
                 d_start = ms_start if ms_start is not None else comp_start
                 d_end = ms_end if ms_end is not None else comp_end
             else:
                 d_start, d_end = comp_start, comp_end
             if d_start is None:
-                continue
+                return None
             pivot = round((d_start + (d_end if d_end is not None else d_start)) / 2)
-            bin_start = (pivot // bin_size) * bin_size
-            period_counts[bin_start] = period_counts.get(bin_start, 0) + count
+            return (pivot // bin_size) * bin_size
 
-        return dict(sorted(period_counts.items()))
+        period_counts = {}
+        for comp_start, comp_end, ms_start, ms_end, count in results:
+            b = _bin(comp_start, comp_end, ms_start, ms_end)
+            if b is None:
+                continue
+            period_counts[b] = period_counts.get(b, 0) + count
+
+        if not normalize:
+            return dict(sorted(period_counts.items()))
+
+        total_query = self.db.query(
+            Text.period_start,
+            Text.period_end,
+            Text.ms_date_start,
+            Text.ms_date_end,
+            func.count(Token.token_id).label('total')
+        ).join(Text, Token.text_id == Text.text_id)
+
+        meta_filters = self._build_metadata_filters(domain=domain, genre=genre, subcorpus_id=subcorpus_id, dataset_id=dataset_id)
+        if meta_filters:
+            total_query = total_query.filter(and_(*meta_filters))
+        total_results = total_query.group_by(
+            Text.period_start, Text.period_end,
+            Text.ms_date_start, Text.ms_date_end,
+        ).all()
+
+        bin_totals = {}
+        for comp_start, comp_end, ms_start, ms_end, total in total_results:
+            b = _bin(comp_start, comp_end, ms_start, ms_end)
+            if b is None:
+                continue
+            bin_totals[b] = bin_totals.get(b, 0) + total
+
+        normalized = {}
+        for b, count in period_counts.items():
+            if b in bin_totals and bin_totals[b] > 0:
+                normalized[b] = round((count / bin_totals[b]) * per_n_words, 2)
+        return dict(sorted(normalized.items()))
 
     def lemma_index(
         self,
