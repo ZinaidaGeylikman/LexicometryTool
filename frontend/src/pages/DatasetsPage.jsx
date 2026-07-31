@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchDatasets, createDataset, deleteDataset } from "../api/client";
+import { fetchDatasets, createDataset, deleteDataset, importDatasetFromCsv } from "../api/client";
 
 export default function DatasetsPage() {
   const navigate = useNavigate();
@@ -18,6 +18,12 @@ export default function DatasetsPage() {
     context_before: "5",
     context_after: "5",
   });
+  const [showImport, setShowImport] = useState(false);
+  const [importForm, setImportForm] = useState({ name: "", description: "", context_before: "0", context_after: "0" });
+  const [importFile, setImportFile] = useState(null);
+  const [importResult, setImportResult] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   const load = () => {
     setLoading(true);
@@ -54,6 +60,32 @@ export default function DatasetsPage() {
     }
   };
 
+  const handleImport = async (e) => {
+    e.preventDefault();
+    if (!importFile) { setError("Please select a CSV file."); return; }
+    setError(null);
+    setImportResult(null);
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("name", importForm.name);
+      fd.append("description", importForm.description);
+      fd.append("context_before", importForm.context_before);
+      fd.append("context_after", importForm.context_after);
+      fd.append("file", importFile);
+      const res = await importDatasetFromCsv(fd);
+      setImportResult({ matched: res.matched, unmatched: res.unmatched });
+      setImportForm({ name: "", description: "", context_before: "5", context_after: "5" });
+      setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Delete dataset "${name}"?`)) return;
     try {
@@ -79,9 +111,14 @@ export default function DatasetsPage() {
           A dataset is a sub-corpus created from query results. Once created, you can search <em>within</em> it
           to refine your analysis.
         </p>
-        <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}>
-          {showCreate ? "Cancel" : "Create Dataset"}
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="btn btn-primary" onClick={() => { setShowCreate(!showCreate); setShowImport(false); }}>
+            {showCreate ? "Cancel" : "Create Dataset"}
+          </button>
+          <button className="btn" onClick={() => { setShowImport(!showImport); setShowCreate(false); setImportResult(null); }}>
+            {showImport ? "Cancel" : "Import from CSV"}
+          </button>
+        </div>
 
         {showCreate && (
           <form onSubmit={handleCreate} className="create-form">
@@ -148,6 +185,61 @@ export default function DatasetsPage() {
               </div>
             </div>
             <button type="submit" className="btn btn-primary">Create</button>
+          </form>
+        )}
+
+        {showImport && (
+          <form onSubmit={handleImport} className="create-form">
+            <div className="form-sections">
+              <div className="form-section">
+                <div className="form-section-header">Dataset</div>
+                <div className="form-section-fields">
+                  <div className="form-group">
+                    <label>Name</label>
+                    <input value={importForm.name} onChange={(e) => setImportForm({ ...importForm, name: e.target.value })} required placeholder="e.g. Curated roi examples" />
+                  </div>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <input value={importForm.description} onChange={(e) => setImportForm({ ...importForm, description: e.target.value })} placeholder="Optional note" />
+                  </div>
+                </div>
+              </div>
+              <div className="form-section">
+                <div className="form-section-header">CSV file</div>
+                <div className="form-section-fields">
+                  <div className="form-group">
+                    <label>File</label>
+                    <input ref={fileInputRef} type="file" accept=".csv" onChange={(e) => setImportFile(e.target.files[0] || null)} required />
+                    <small>Use a CSV exported from the Query page (same columns, same order).</small>
+                  </div>
+                </div>
+              </div>
+              <div className="form-section">
+                <div className="form-section-header">Context window</div>
+                <div className="form-section-fields">
+                  <div className="form-group">
+                    <label>Words before pivot</label>
+                    <input type="number" min={0} max={50} value={importForm.context_before} onChange={(e) => setImportForm({ ...importForm, context_before: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Words after pivot</label>
+                    <input type="number" min={0} max={50} value={importForm.context_after} onChange={(e) => setImportForm({ ...importForm, context_after: e.target.value })} />
+                  </div>
+                  <small style={{ gridColumn: "1 / -1" }}>
+                    Keep at 0 to search only the pivot tokens themselves. Set larger values if you want to search for co-occurring words within the surrounding context.
+                  </small>
+                </div>
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={importing}>
+              {importing ? "Importing…" : "Import"}
+            </button>
+            {importResult && (
+              <p style={{ marginTop: "0.5rem", color: importResult.unmatched > 0 ? "#b45309" : "#15803d" }}>
+                Imported {importResult.matched} token{importResult.matched !== 1 ? "s" : ""}.
+                {importResult.unmatched > 0 && ` ${importResult.unmatched} row${importResult.unmatched !== 1 ? "s" : ""} could not be matched and were skipped.`}
+              </p>
+            )}
           </form>
         )}
       </div>

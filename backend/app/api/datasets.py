@@ -1,5 +1,7 @@
 """API routes for dataset management"""
-from fastapi import APIRouter, Depends, HTTPException
+import csv
+import io
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from ..core.database import get_db
 from ..queries.dataset_manager import DatasetManager
@@ -34,6 +36,47 @@ def create_dataset(params: DatasetCreateParams, db: Session = Depends(get_db)):
 
     dataset = manager.get_dataset(dataset_id)
     return DatasetResponse.model_validate(dataset)
+
+
+@router.post("/import-csv")
+async def import_dataset_from_csv(
+    name: str = Form(...),
+    description: str = Form(""),
+    context_before: int = Form(5),
+    context_after: int = Form(5),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Create a dataset from a curated query-export CSV file."""
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows.")
+
+    manager = DatasetManager(db)
+    try:
+        result = manager.import_from_csv(
+            name=name,
+            rows=rows,
+            description=description or None,
+            context_before=context_before,
+            context_after=context_after,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    dataset = manager.get_dataset(result["dataset_id"])
+    return {
+        **DatasetResponse.model_validate(dataset).model_dump(),
+        "matched": result["matched"],
+        "unmatched": result["unmatched"],
+    }
 
 
 @router.delete("/{dataset_id}")

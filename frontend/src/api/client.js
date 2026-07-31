@@ -111,6 +111,16 @@ export function deleteDataset(id) {
   return request(`/datasets/${id}`, { method: "DELETE" });
 }
 
+export async function importDatasetFromCsv(formData) {
+  const url = `${API_BASE}/datasets/import-csv`;
+  const res = await fetch(url, { method: "POST", body: formData });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- Admin ---
 export function renormalizeLemmas() {
   return request("/admin/renormalize", { method: "POST" });

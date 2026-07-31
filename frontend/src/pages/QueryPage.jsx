@@ -225,13 +225,14 @@ function SimpleQuery({ datasets, subcorpora, texts, initialDatasetId, initialSta
   const handleExport = async () => {
     const params = { ...buildParams(0), limit: results.total };
     const data = await queryCorpus(params);
-    const header = ["Text", "Domain", "Genre", "Period start", "Period end", "Citation", "Context before", "Match", "Lemma", "POS", "Context after"];
+    const header = ["Text", "Domain", "Genre", "Period start", "Period end", "Citation", "Context before", "Match", "Lemma", "POS", "Context after", "Token ID"];
     const rows = data.results.map((r) => [
       r.text_title, r.domain, r.genre, r.period_start, r.period_end, r.citation,
       r.context_before.map((t) => t.token).join(" "),
       r.token,
       r.lemma, r.pos,
       r.context_after.map((t) => t.token).join(" "),
+      r.token_id,
     ]);
     downloadCsv(toCsv([header, ...rows]), "query_results.csv");
   };
@@ -454,7 +455,7 @@ function SequenceQuery({ datasets, subcorpora, texts, initialDatasetId }) {
   const handleExport = async () => {
     const params = { ...buildParams(0), limit: results.total };
     const data = await querySequence(params);
-    const header = ["Text", "Domain", "Genre", "Period start", "Period end", "Citation", "Context before", "Match", "Lemmas", "POS tags", "Context after"];
+    const header = ["Text", "Domain", "Genre", "Period start", "Period end", "Citation", "Context before", "Match", "Lemmas", "POS tags", "Context after", "Token ID"];
     const rows = data.results.map(({ tokens }) => {
       const first = tokens[0];
       const last = tokens[tokens.length - 1];
@@ -465,6 +466,7 @@ function SequenceQuery({ datasets, subcorpora, texts, initialDatasetId }) {
         tokens.map((t) => t.lemma).join(" + "),
         tokens.map((t) => t.pos).join(" + "),
         last.context_after.map((t) => t.token).join(" "),
+        first.token_id,
       ];
     });
     downloadCsv(toCsv([header, ...rows]), "query_results.csv");

@@ -67,13 +67,17 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
   const chartTitle = `Frequency of ${filterLabel || "(all)"} by ${view} (${yLabel})`;
   const isPie = chartType === "pie" && view !== "period" && view !== "text";
 
+  const total = !normalize ? data.reduce((s, d) => s + d.value, 0) : 0;
+  const pct = (v) => total > 0 ? `${((v / total) * 100).toFixed(1)}%` : "—";
+  const tooltipFmt = normalize ? (v) => v : (v) => `${v} (${pct(v)})`;
+
   if (data.length === 0) {
     return <div className="card">No data found for the given filters.</div>;
   }
 
   const handleExportCsv = () => {
-    const header = [colHeader, normalize ? "Relative freq." : "Count"];
-    const rows = data.map((d) => [d.name, d.value]);
+    const header = normalize ? [colHeader, "Relative freq."] : [colHeader, "Count", "%"];
+    const rows = normalize ? data.map((d) => [d.name, d.value]) : data.map((d) => [d.name, d.value, pct(d.value)]);
     const csv =
       "\uFEFF" +
       [header, ...rows]
@@ -124,7 +128,7 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={tooltipFmt} />
               <Legend />
               <Line type="monotone" dataKey="value" name={yLabel} stroke="#4a6fa5" strokeWidth={2} activeDot={{ r: 6, style: { cursor: "pointer" } }} />
             </LineChart>
@@ -146,7 +150,7 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
                   <Cell key={i} fill={entry.fill} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [value, yLabel]} />
+              <Tooltip formatter={(value) => [tooltipFmt(value), yLabel]} />
               <Legend />
             </PieChart>
           ) : (
@@ -154,7 +158,7 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={tooltipFmt} />
               <Legend />
               <Bar dataKey="value" name={yLabel} fill="#4a6fa5" onClick={(entry) => handleSliceClick(entry)}>
                 {data.map((_, i) => (
@@ -176,6 +180,7 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
           <tr>
             <th>{colHeader}</th>
             <th>{normalize ? "Relative freq." : "Count"}</th>
+            {!normalize && <th>%</th>}
           </tr>
         </thead>
         <tbody>
@@ -183,6 +188,7 @@ function FrequencyResults({ data, view, normalize, perN, filterLabel, searchCont
             <tr key={d.name}>
               <td>{d.name}</td>
               <td>{d.value}</td>
+              {!normalize && <td>{pct(d.value)}</td>}
             </tr>
           ))}
         </tbody>

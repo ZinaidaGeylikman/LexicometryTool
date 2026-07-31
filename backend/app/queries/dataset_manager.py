@@ -228,6 +228,91 @@ class DatasetManager:
         self.db.commit()
         return True
 
+    def import_from_csv(
+        self,
+        name: str,
+        rows: List[Dict[str, str]],
+        description: Optional[str] = None,
+        context_before: int = 5,
+        context_after: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        Create a dataset from pre-curated CSV rows exported by the query page.
+
+        Expected row keys (same as export header):
+          Text, Domain, Genre, Period start, Period end, Citation,
+          Context before, Match, Lemma, POS, Context after
+
+        Returns dict with dataset_id and counts of matched/unmatched rows.
+        """
+        from sqlalchemy import func
+
+        matched = []
+        unmatched = []
+
+        for row in rows:
+            token = None
+
+            token_id_str = row.get("Token ID", "").strip()
+            if token_id_str.isdigit():
+                token = self.db.query(Token).filter(Token.token_id == int(token_id_str)).first()
+
+            if token is None:
+                text_label = row.get("Text", "").strip()
+                citation   = row.get("Citation", "").strip()
+                form       = row.get("Match", "").strip()
+
+                if not text_label or not form:
+                    unmatched.append(row)
+                    continue
+
+                text = self.db.query(Text).filter(
+                    func.coalesce(Text.title, Text.filename) == text_label
+                ).first()
+                if text is None:
+                    unmatched.append(row)
+                    continue
+
+                token_q = self.db.query(Token).filter(
+                    Token.text_id == text.text_id,
+                    Token.token == form,
+                )
+                if citation:
+                    token_q = token_q.filter(Token.citation == citation)
+                token = token_q.first()
+
+            if token is None:
+                unmatched.append(row)
+                continue
+
+            matched.append(token)
+
+        dataset = Dataset(
+            name=name,
+            description=description,
+            query_params=json.dumps({"source": "csv_import"}),
+            token_count=len(matched),
+        )
+        self.db.add(dataset)
+        self.db.flush()
+
+        for token in matched:
+            self.db.add(DatasetToken(
+                dataset_id=dataset.dataset_id,
+                token_id=token.token_id,
+                match_position=token.position,
+                context_start_position=token.position - context_before,
+                context_end_position=token.position + context_after,
+            ))
+
+        self.db.commit()
+
+        return {
+            "dataset_id": dataset.dataset_id,
+            "matched": len(matched),
+            "unmatched": len(unmatched),
+        }
+
     def delete_temporary_datasets(self) -> int:
         """Delete all temporary datasets, return count deleted"""
         count = self.db.query(Dataset).filter(
