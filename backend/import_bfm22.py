@@ -1,5 +1,5 @@
 """
-Batch import all TEI-TXM files from BFM22 into LogoScope.
+Batch import all TEI-TXM files from BFM22 into TextoScope.
 Downloads from the public GitLab repo and ingests via CorpusManager.
 
 Usage (from backend/):

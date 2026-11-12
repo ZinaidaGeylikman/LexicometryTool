@@ -16,7 +16,7 @@ export default function Layout() {
     <div className="app-layout">
       <header className="app-header">
         <Link to="/" className="app-brand" style={{ textDecoration: "none", color: "inherit" }}>
-          <h1 className="app-title">LogoScope</h1>
+          <h1 className="app-title">TextoScope</h1>
           <span className="app-subtitle">Medieval French Corpus Tool</span>
         </Link>
         <nav className="app-nav">

@@ -1,5 +1,5 @@
 """
-Merge multi-part texts into single records in the LogoScope database.
+Merge multi-part texts into single records in the TextoScope database.
 Run from backend/:  python3 merge_parts.py [--dry-run]
 """
 import sys

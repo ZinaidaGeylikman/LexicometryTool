@@ -1,5 +1,5 @@
 """
-Batch import all TEI-XML files from the MICLE public corpus into LogoScope.
+Batch import all TEI-XML files from the MICLE public corpus into TextoScope.
 Each text lives at: Core corpus/Fr/{dir}/XML-TEI/{dir}.xml
 
 Usage (from backend/):
